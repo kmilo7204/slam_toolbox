@@ -17,6 +17,7 @@
 /* Author: Steven Macenski */
 
 #include "slam_toolbox/experimental/slam_toolbox_lifelong.hpp"
+#include <iostream>
 
 namespace slam_toolbox
 {
@@ -62,6 +63,7 @@ LifelongSlamToolbox::LifelongSlamToolbox(ros::NodeHandle& nh)
 
   // in lifelong mode, we cannot have interactive mode enabled
   enable_interactive_mode_ = false;
+
 }
 
 /*****************************************************************************/
@@ -69,6 +71,9 @@ void LifelongSlamToolbox::laserCallback(
   const sensor_msgs::LaserScan::ConstPtr& scan)
 /*****************************************************************************/
 {
+  // I need to test from respect of what is taken the angle.
+
+
   // no odom info
   Pose2 pose;
   if(!pose_helper_->getOdomPose(pose, scan->header.stamp))
@@ -85,13 +90,31 @@ void LifelongSlamToolbox::laserCallback(
       " %s; discarding scan", scan->header.frame_id.c_str());
     return;
   }
-
+  static bool enter = false;
   // LTS additional bounded node increase parameter (rate, or total for run or at all?)
   // LTS pseudo-localization mode. If want to add a scan, but not deleting a scan, add to local buffer?
   // LTS if (eval() && dont_add_more_scans) {addScan()} else {localization_add_scan()}
   // LTS if (eval() && ctr / total < add_rate_scans) {addScan()} else {localization_add_scan()}
   karto::LocalizedRangeScan* range_scan = addScan(laser, scan, pose);
-  evaluateNodeDepreciation(range_scan);
+  if (range_scan != nullptr)
+  {
+    std::cout << "-----------------> Appending... " << std::endl;
+    std::cout << "Range scan value: " << scan->ranges[0] << std::endl;
+    range_scan_vct.push_back(range_scan);
+  }
+
+  if (range_scan_vct.size() == 3)
+  {
+    if (!enter)
+    {
+      std::cout << "-----------------> Starting... " << std::endl;
+      // std::tuple<int, kt_double> min_inf = inf_estimates.findLeastInformativeLaser(range_scan_vct);
+      kt_double information = inf_estimates.findMutualInfo(range_scan_vct);
+      enter = true;
+    }
+    // range_scan_vct.clear();
+  }
+  // evaluateNodeDepreciation(range_scan);
   return;
 }
 
@@ -100,22 +123,70 @@ void LifelongSlamToolbox::evaluateNodeDepreciation(
   LocalizedRangeScan* range_scan)
 /*****************************************************************************/
 {
+  // This is the unique modification I should made.
+
+  /*
+    karto::Vertex<karto::LocalizedRangeScan>* GetVertex()
+    ScoredVertices is and std::vector<ScoredVertex>
+    ScoredVertex is a class which receives as a parameter.
+      karto::Vertex<karto::LocalizedRangeScan>* vertex, double score
+  */
+
   if (range_scan)
   {
     boost::mutex::scoped_lock lock(smapper_mutex_);
 
     const BoundingBox2& bb = range_scan->GetBoundingBox();
     const Size2<double> bb_size = bb.GetSize();
+    // El radio podria acortarlo para considerar una menor cantidad de muestras
     double radius = sqrt(bb_size.GetWidth()*bb_size.GetWidth() +
       bb_size.GetHeight()*bb_size.GetHeight()) / 2.0;
     Vertices near_scan_vertices = FindScansWithinRadius(range_scan, radius);
+
+    // From a single scan we get its bonding box
+    // And we also get the near scans here
+    // std::cout << "/////////////////////////////////" << std::endl;
+    // std::cout << "Evaluating node deprecation" << std::endl;
+    // std::cout << "BB width: " << bb_size.GetWidth() << ", BB Height: " << bb_size.GetHeight() << std::endl;
+    // std::cout << near_scan_vertices.size() << std::endl;
+    // std::cout << "/////////////////////////////////" << std::endl;
+
+    /*
+      - Primero hagamos la verificacion de la cantidad de vertices, aumenta esto cuando cambiamos
+      de un nodo a otro?
+
+        - La cantidad de vertices cercanos aumenta en la medida en que se expande la simulacion
+        - La eliminacion de nodos se hace de manera progresiva (Veo uno o dos nodos removidos)
+        como maximo.
+    */
 
     ScoredVertices scored_verices =
       computeScores(near_scan_vertices, range_scan);
 
     ScoredVertices::iterator it;
+
+    /*
+      - Actually from FindScansWithin
+
+      - I need the Vertex information, so the functions removeFromSlamGraph
+      and updateScoresSlamGraph are not affected (And can be reused)
+
+      - What I think I can do is replace or modify the computeScores function,
+      so I bring my implementation into this node.
+    */
+
     for (it = scored_verices.begin(); it != scored_verices.end(); ++it)
     {
+      /*
+        - Aqui es necesario recordar que nuestra metrica para eliminar un nodo no va a ser
+        la misma metrica que usa SLAM Toolbox, ahora solamente depende de la informacion mutua.
+
+        - No tiene mucho sentido observar el score actual
+          std::cout << "Scored vertice score: " << it->GetScore() << std::endl;
+      */
+
+      // ROS_INFO("Node score: %f", it->GetScore());
+      // if (it->GetScore() < 1500.0)
       if (it->GetScore() < removal_score_)
       {
         ROS_INFO("Removing node %i from graph with score: %f and "
@@ -151,7 +222,7 @@ Vertices LifelongSlamToolbox::FindScansWithinRadius(
   }
   else
   {
-    return 
+    return
       smapper_->getMapper()->GetGraph()->FindNearLinkedVertices(scan, radius);
   }
 }
@@ -200,8 +271,8 @@ double LifelongSlamToolbox::computeObjectiveScore(
     - overlap
     - nearby_penalty_;
 
-  //score += (initial_score - score) * candidate_scale_factor; 
-  
+  // score += (initial_score - score) * candidate_scale_factor;
+
   if (score > 1.0)
   {
     ROS_ERROR("Objective function calculated for vertex score (%0.4f)"
@@ -250,11 +321,111 @@ double LifelongSlamToolbox::computeScore(
   return score;
 }
 
+// /*****************************************************************************/
+double
+LifelongSlamToolbox::computeScoresBeta(
+  LocalizedRangeScan* reference_scan,
+  Vertex<LocalizedRangeScan>* candidate,
+  const double& initial_score,
+  const int& num_candidates)
 /*****************************************************************************/
-ScoredVertices
-LifelongSlamToolbox::computeScores(
-  Vertices& near_scans,
-  LocalizedRangeScan* range_scan)
+{
+  // ScoredVertices scored_vertices;
+  // scored_vertices.reserve(near_scans.size());
+
+  // // Add the element to range_scan_vct
+  // std::vector<kt_double> local_mut_inf = inf_estimates.findLeastInformativeLaser(range_scan_vct);
+  //   // Append the current mutual information to the total mutual information
+  // mut_inf_vector.insert(mut_inf_vector.end(), std::begin(local_mut_inf), std::end(local_mut_inf));
+  //   // Clean the current range vector (For the next batch)
+  // range_scan_vct.clear();
+
+  // int idx_res = 0;
+  // for (candidate_scan_it = near_scans.begin();
+  //   candidate_scan_it != near_scans.end(); ++candidate_scan_it)
+  // {
+  //   if (mut_inf_vector.size() > 0)
+  //   {
+  //     ScoredVertex scored_vertex((*candidate_scan_it), mut_inf_vector[idx_res]);
+  //     scored_vertices.push_back(scored_vertex);
+  //     idx_res++;
+  //   }
+  // }
+  return 1.0f;
+}
+
+
+// ScoredVertices
+// LifelongSlamToolbox::computeScoresBeta(
+//   Vertices& near_scans,
+//   LocalizedRangeScan* range_scan)
+// /*****************************************************************************/
+// {
+//   ScoredVertices scored_vertices;
+//   scored_vertices.reserve(near_scans.size());
+
+//   // must have some minimum metric to utilize
+//   // IOU will drop sharply with fitment, I'd advise not setting this value
+//   // any higher than 0.15. Also check this is a linked constraint
+//   // We want to do this early to get a better estimate of local candidates
+//   ScanVector::iterator candidate_scan_it;
+//   double iou = 0.0;
+
+//   std::vector<kt_double> mut_inf_vector;
+
+//   std::cout << "-----> New call <-----" << std::endl;
+
+//   for (candidate_scan_it = near_scans.begin(); candidate_scan_it != near_scans.end(); )
+//   {
+//     iou = computeIntersectOverUnion(range_scan, (*candidate_scan_it)->GetObject());
+//     if (iou < iou_thresh_ || (*candidate_scan_it)->GetEdges().size() < 2)
+//     {
+//       candidate_scan_it = near_scans.erase(candidate_scan_it);
+//     }
+//     else
+//     {
+//       // Need to wait for at least 7 laser readings
+//       if(range_scan_vct.size() == 7)
+//       {
+//         std::cout << "Processing batch" << std::endl;
+//         // Process the mutual information in batches of 7 readings
+//         std::vector<kt_double> local_mut_inf = inf_estimates.findLeastInformativeLaser(range_scan_vct);
+//         // Append the current mutual information to the total mutual information
+//         mut_inf_vector.insert(mut_inf_vector.end(), std::begin(local_mut_inf), std::end(local_mut_inf));
+//         // Clean the current range vector (For the next batch)
+//         range_scan_vct.clear();
+//       }
+//       else
+//       {
+//         range_scan_vct.push_back((*candidate_scan_it)->GetObject());
+//         ++candidate_scan_it;
+//       }
+//     }
+//   }
+
+//   int idx_res = 0;
+//   for (candidate_scan_it = near_scans.begin();
+//     candidate_scan_it != near_scans.end(); ++candidate_scan_it)
+//   {
+//     if (mut_inf_vector.size() > 0)
+//     {
+//       ScoredVertex scored_vertex((*candidate_scan_it), mut_inf_vector[idx_res]);
+//       scored_vertices.push_back(scored_vertex);
+//       idx_res++;
+//     }
+//   }
+//   return scored_vertices;
+// }
+
+
+
+
+
+/*****************************************************************************/
+/*****************************************************************************/
+ScoredVertices LifelongSlamToolbox::computeScores(
+  Vertices & near_scans,
+  LocalizedRangeScan * range_scan)
 /*****************************************************************************/
 {
   ScoredVertices scored_vertices;
@@ -266,31 +437,30 @@ LifelongSlamToolbox::computeScores(
   // We want to do this early to get a better estimate of local candidates
   ScanVector::iterator candidate_scan_it;
   double iou = 0.0;
-  for (candidate_scan_it = near_scans.begin();
-    candidate_scan_it != near_scans.end(); )
+  for (candidate_scan_it = near_scans.begin(); candidate_scan_it != near_scans.end(); )
   {
-    iou = computeIntersectOverUnion(range_scan,
-      (*candidate_scan_it)->GetObject());
-    if (iou < iou_thresh_ || (*candidate_scan_it)->GetEdges().size() < 2)
+    iou = computeIntersectOverUnion(range_scan, (*candidate_scan_it)->GetObject());
+    if (iou < iou_thresh_ || (*candidate_scan_it)->GetEdges().size() < 2) 
     {
       candidate_scan_it = near_scans.erase(candidate_scan_it);
     }
-    else
-    {
+    else {
       ++candidate_scan_it;
     }
   }
 
-  for (candidate_scan_it = near_scans.begin();
-    candidate_scan_it != near_scans.end(); ++candidate_scan_it)
+  for (candidate_scan_it = near_scans.begin(); candidate_scan_it != near_scans.end(); ++candidate_scan_it)
   {
     ScoredVertex scored_vertex((*candidate_scan_it),
       computeScore(range_scan, (*candidate_scan_it),
-        (*candidate_scan_it)->GetScore(), near_scans.size()));
+      (*candidate_scan_it)->GetScore(), near_scans.size()));
     scored_vertices.push_back(scored_vertex);
   }
   return scored_vertices;
 }
+/*****************************************************************************/
+/*****************************************************************************/
+
 
 /*****************************************************************************/
 void LifelongSlamToolbox::removeFromSlamGraph(
