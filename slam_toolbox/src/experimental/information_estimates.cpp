@@ -244,7 +244,7 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
 
             if ( laser_point.GetX() > upper_limit_cell.GetX() || laser_point.GetY() > upper_limit_cell.GetY() || laser_point.GetX() < lower_limit_cell.GetX() || laser_point.GetY() < lower_limit_cell.GetY())
             {
-                std::cout << "There is something wrong" << std::endl;
+                // std::cout << "There is something wrong" << std::endl;
             }
         }
 
