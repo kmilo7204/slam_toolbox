@@ -166,8 +166,8 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
         karto::Vector2<int> local_robot_cell = utils::grid_operations::getGridPosition(local_grid_robot_pose.GetPosition(), m_cell_resol);
 
         std::cout << " =================== " << std::endl;
-        std::cout << "Lower limit cell: " << lower_limit_cell.GetX() * m_cell_resol << ", " << lower_limit_cell.GetY() * m_cell_resol << std::endl;
-        std::cout << "Upper limit cell: " << upper_limit_cell.GetX() * m_cell_resol << ", " << upper_limit_cell.GetY() * m_cell_resol << std::endl;
+        // std::cout << "Lower limit cell: " << lower_limit_cell.GetX() * m_cell_resol << ", " << lower_limit_cell.GetY() * m_cell_resol << std::endl;
+        // std::cout << "Upper limit cell: " << upper_limit_cell.GetX() * m_cell_resol << ", " << upper_limit_cell.GetY() * m_cell_resol << std::endl;
 
         std::cout << "Lower limit cell: " << lower_limit_cell.GetX() << ", " << lower_limit_cell.GetY() << std::endl;
         std::cout << "Upper limit cell: " << upper_limit_cell.GetX() << ", " << upper_limit_cell.GetY() << std::endl;
@@ -189,13 +189,13 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
         // // // std::cout << "Laser points cells: " << laser_point.GetX() << ", " << laser_point.GetY() << std::endl;
         // // // std::cout << " =================== " << std::endl;
 
-        kt_double robot_heading_real = robot_pose_raw.GetHeading();
-        kt_double robot_heading = robot_pose_raw.GetHeading();
-        robot_heading = robot_heading < 0.0 ? (2.0 * M_PI + robot_heading) : robot_heading;
+        // kt_double robot_heading_real = robot_pose_raw.GetHeading();
+        // kt_double robot_heading = robot_pose_raw.GetHeading();
+        // robot_heading = robot_heading < 0.0 ? (2.0 * M_PI + robot_heading) : robot_heading;
 
 
         // In this case angle increment is 1 degree
-        int laser_index = robot_heading / 0.0174533;
+        // int laser_index = robot_heading / 0.0174533;
         // std::cout << "Real: " << robot_heading_real << ", Transformed: " << robot_heading << std::endl;
 
         // This in reality should be the size, but for now it is ok
@@ -208,45 +208,45 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
 
             - Also I do not need to iterate over all the cells, but only in the ones given by the limits
         */
-        for (int i = 0; i < 360; ++i)
-        {
-            laser_index = laser_index > 359 ? 0 : laser_index;
+        // for (int i = 0; i < 360; ++i)
+        // {
+        //     laser_index = laser_index > 359 ? 0 : laser_index;
 
-            // std::cout << "Index Real: " << i << ", Index offset: " << laser_index << std::endl;
-            // std::cout << "Real: " << robot_heading_real << ", Transformed: " << robot_heading << std::endl;
-            // std::cout << "Laser index: " << laser_index << std::endl;
+        //     // std::cout << "Index Real: " << i << ", Index offset: " << laser_index << std::endl;
+        //     // std::cout << "Real: " << robot_heading_real << ", Transformed: " << robot_heading << std::endl;
+        //     // std::cout << "Laser index: " << laser_index << std::endl;
 
-            kt_double reading_distance = range_scans[n]->GetRangeReadings()[laser_index];
-            if (reading_distance > m_max_sensor_range)
-            {
-                // In case of infinity range
-                ++laser_index;
-                continue;
-            }
+        //     kt_double reading_distance = range_scans[n]->GetRangeReadings()[laser_index];
+        //     if (reading_distance > m_max_sensor_range)
+        //     {
+        //         // In case of infinity range
+        //         ++laser_index;
+        //         continue;
+        //     }
 
-            kt_double point_x = local_grid_robot_pose.GetX() + (reading_distance * cos(laser_index / (180.0 / M_PI)));
-            kt_double point_y = local_grid_robot_pose.GetY() + (reading_distance * sin(laser_index / (180.0 / M_PI)));
+        //     kt_double point_x = local_grid_robot_pose.GetX() + (reading_distance * cos(laser_index / (180.0 / M_PI)));
+        //     kt_double point_y = local_grid_robot_pose.GetY() + (reading_distance * sin(laser_index / (180.0 / M_PI)));
 
-            // std::cout << "Reading distance: " << reading_distance << std::endl;
-            // std::cout << "Cos and Sin: " << cos(laser_index / (180.0 / M_PI)) << ", " << sin(laser_index / (180.0 / M_PI)) << std::endl;
-            // std::cout << "Local robot pose: " << local_grid_robot_pose.GetX() << ", " << local_grid_robot_pose.GetY() << std::endl;
-            // std::cout << "Transformed laser points: " << point_x * m_cell_resol << ", " << point_y * m_cell_resol << std::endl;
+        //     // std::cout << "Reading distance: " << reading_distance << std::endl;
+        //     // std::cout << "Cos and Sin: " << cos(laser_index / (180.0 / M_PI)) << ", " << sin(laser_index / (180.0 / M_PI)) << std::endl;
+        //     // std::cout << "Local robot pose: " << local_grid_robot_pose.GetX() << ", " << local_grid_robot_pose.GetY() << std::endl;
+        //     // std::cout << "Transformed laser points: " << point_x * m_cell_resol << ", " << point_y * m_cell_resol << std::endl;
 
-            karto::Vector2<int> laser_point = utils::grid_operations::getGridPosition({point_x, point_y}, m_cell_resol);
-            std::cout << "Cell robot pose: " << local_robot_cell.GetX() << ", " << local_robot_cell.GetY() << std::endl;
-            std::cout << "Laser points cells: " << laser_point.GetX() << ", " << laser_point.GetY() << std::endl;
-            std::cout << " =================== " << std::endl;
+        //     karto::Vector2<int> laser_point = utils::grid_operations::getGridPosition({point_x, point_y}, m_cell_resol);
+        //     std::cout << "Cell robot pose: " << local_robot_cell.GetX() << ", " << local_robot_cell.GetY() << std::endl;
+        //     std::cout << "Laser points cells: " << laser_point.GetX() << ", " << laser_point.GetY() << std::endl;
+        //     std::cout << " =================== " << std::endl;
 
-            ++laser_index;
+        //     ++laser_index;
 
-            // I need to take the initial robot pose calculate if tis postive or negative.
-            // That will be the initial index for our calculations
+        //     // I need to take the initial robot pose calculate if tis postive or negative.
+        //     // That will be the initial index for our calculations
 
-            if ( laser_point.GetX() > upper_limit_cell.GetX() || laser_point.GetY() > upper_limit_cell.GetY() || laser_point.GetX() < lower_limit_cell.GetX() || laser_point.GetY() < lower_limit_cell.GetY())
-            {
-                // std::cout << "There is something wrong" << std::endl;
-            }
-        }
+        //     if ( laser_point.GetX() > upper_limit_cell.GetX() || laser_point.GetY() > upper_limit_cell.GetY() || laser_point.GetX() < lower_limit_cell.GetX() || laser_point.GetY() < lower_limit_cell.GetY())
+        //     {
+        //         std::cout << "There is something wrong" << std::endl;
+        //     }
+        // }
 
         // ======================= TESTING ======================= //
 
@@ -259,6 +259,66 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
         // // std::cout << "Angle: " << cell_laser_angle << std::endl;
         // // ======================= END OF TESTING ======================= //
         // // ======================= START OF CELLS ITERATIONS ======================= //
+        /*
+            Here we can iterate only within the given cells.
+        */
+
+        for (int i = lower_limit_cell.GetX(); i < upper_limit_cell.GetX(); ++i)
+        {
+            for(int j = lower_limit_cell.GetY(); j < upper_limit_cell.GetY(); ++j)
+            {
+                // This is not fully necessary, but I will leave it here for now ===> Testing
+                if ((i < lower_limit_cell.GetX() || i > upper_limit_cell.GetX()) || (j < lower_limit_cell.GetY() || j > upper_limit_cell.GetY()))
+                {
+                    std::cout << "Out of limits" << std::endl;
+                    continue;
+                }
+
+                // There should be an operator for this, but this is working good.
+                karto::Vector2<kt_double> cell_center{ i * m_cell_resol + (m_cell_resol / 2), j * m_cell_resol + (m_cell_resol / 2) };
+                kt_double pose_to_cell_angle = atan2(local_grid_robot_pose.GetY() - cell_center.GetY(), local_grid_robot_pose.GetX() - cell_center.GetX());
+                pose_to_cell_angle = pose_to_cell_angle > 0 ? pose_to_cell_angle : (2.0 * M_PI + pose_to_cell_angle);
+
+                kt_double robot_heading = robot_pose_raw.GetHeading();
+                robot_heading = robot_heading < 0.0 ? (2.0 * M_PI + robot_heading) : robot_heading;
+                int laser_index = robot_heading / 0.0174533; // Change for laser angle_increment
+
+                int aux_index = 0;
+                if ( (laser_index + pose_to_cell_angle) > 359 )
+                {
+                    aux_index = pose_to_cell_angle - (360 - laser_index);
+                }
+                else
+                {
+                    aux_index = pose_to_cell_angle - laser_index;
+                }
+
+                laser_index += aux_index;
+                laser_index = laser_index > 359 ? 0 : laser_index;
+
+                kt_double reading_distance = range_scans[n]->GetRangeReadings()[laser_index];
+                if (reading_distance > m_max_sensor_range)
+                {
+                    // In case of infinity range
+                    ++laser_index;
+                    continue;
+                }
+
+                kt_double point_x = local_grid_robot_pose.GetX() + (reading_distance * cos(laser_index / (180.0 / M_PI)));
+                kt_double point_y = local_grid_robot_pose.GetY() + (reading_distance * sin(laser_index / (180.0 / M_PI)));
+
+                karto::Vector2<int> laser_point = utils::grid_operations::getGridPosition({point_x, point_y}, m_cell_resol);
+                // std::cout << "Cell robot pose: " << local_robot_cell.GetX() << ", " << local_robot_cell.GetY() << std::endl;
+                std::cout << "Current cell: " << i << ", " << j << std::endl;
+                std::cout << "Laser points cells: " << laser_point.GetX() << ", " << laser_point.GetY() << std::endl;
+                std::cout << " =================== " << std::endl;
+
+
+                // std::cout << pose_to_cell_angle * (180.0 / M_PI) << std::endl;
+
+                // int laser_index = (M_PI + pose_to_cell_angle - local_grid_robot_pose.GetHeading()) * (180.0 / M_PI);
+            }
+        }
         // for (int i = 0; i < n_cells_x; ++i)
         // {
         //     for (int j = 0; j < n_cells_y; ++j)
@@ -863,5 +923,4 @@ kt_double InformationEstimates::calculateScanMassProbabilityBetween(kt_double ra
 
     return m_obs_nu * (exp(-m_obs_lambda*range_1) - exp(-m_obs_lambda*range_2));
 }
-
 
