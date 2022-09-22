@@ -192,6 +192,25 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
                     continue;
                 }
 
+                // This one will give me the information
+                LaserRangeFinder* laserRangeFinder = range_scans[n]->GetLaserRangeFinder();
+
+                // These will give me the information I need for every laser
+                kt_double rangeThreshold = pLaserRangeFinder->GetRangeThreshold();
+                kt_double minimumAngle = pLaserRangeFinder->GetMinimumAngle();
+                kt_double angularResolution = pLaserRangeFinder->GetAngularResolution();
+
+                // There should be an operator for this, but this is working good.
+                karto::Vector2<kt_double> cell_center{ i * m_cell_resol + (m_cell_resol / 2), j * m_cell_resol + (m_cell_resol / 2) };
+                kt_double pose_to_cell_angle = atan2(cell_center.GetY() - local_grid_robot_pose.GetY(), cell_center.GetX() - local_grid_robot_pose.GetX());
+                pose_to_cell_angle = pose_to_cell_angle > 0 ? pose_to_cell_angle : (2.0 * M_PI + pose_to_cell_angle);
+
+                kt_double robot_heading = robot_pose_raw.GetHeading();
+                robot_heading = robot_heading < 0.0 ? (2.0 * M_PI + robot_heading) : robot_heading;
+
+                int laser_index = robot_heading / 0.0174533; // This one will be changed
+
+                // So remember that now I need to count from the minimum range.
                 // There should be an operator for this, but this is working good.
                 karto::Vector2<kt_double> cell_center{ i * m_cell_resol + (m_cell_resol / 2), j * m_cell_resol + (m_cell_resol / 2) };
                 kt_double pose_to_cell_angle = atan2(cell_center.GetY() - local_grid_robot_pose.GetY(), cell_center.GetX() - local_grid_robot_pose.GetX());
