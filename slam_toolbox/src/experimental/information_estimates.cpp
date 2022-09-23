@@ -250,11 +250,17 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
 
                 // These will give me the information I need for every laser
                 kt_double rangeThreshold = laserRangeFinder->GetRangeThreshold();
+                kt_double angle_increment = laserRangeFinder->GetAngularResolution();
                 kt_double min_angle = laserRangeFinder->GetMinimumAngle();
                 kt_double max_angle = laserRangeFinder->GetMaximumAngle();
 
                 kt_double angular_resolution = laserRangeFinder->GetAngularResolution();
 
+                std:: cout << "Min angle:" << min_angle << "\n";
+                std:: cout << "Max angle:" << max_angle << "\n";
+                std:: cout << "Angle increment:" << angle_increment << "\n";
+
+                return
                 // Min range to Max range
                 // For laser range [-90, 90]
                 // For laser range [-180, 180]
@@ -288,9 +294,71 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
                 // It would work for both options
 
                 float fov = max_angle - min_angle;
-
-                // I think this is it
                 int idx = fov / 2.0 + angle_diff;
+
+                // Min angle:-3.12414
+                // Max angle: 3.14159
+                // Angle increment:0.0174533
+
+                // Este es un caso poco probable
+                // Angle to cell: 76
+                // Heading: 0
+                // angle_diff: 76
+                // min_angle: 90
+                // max_angle: -90
+                // fov: 0
+                // idx: 0 + 76: 76
+                // Cuando el angulo minimo superior a cero, tengo que sumar ambos elementos y divirlos en dos
+                // Entonces en este caso fov 90
+                // idx: 90 - 76: 24
+
+                // =================================================================
+                // =====> Este es un caso que puede tener lugar
+                // 0 to 360 the half will be 180
+                // Angle to cell: 1
+                // Heading: 0
+                // angle_diff: 1
+                // min_angle: 0
+                // max_angle: 359
+                // fov = (359 - 0) / 2: 180
+                // idx: 180 + 1: 181
+                // Lo unico que funciona aca es cuando el angulo minimo es 0 o mas
+                // Entonces ahi debo hacer ese fov = 0, ya que ahi inicia el index
+                // fov: 0
+                // idx: 0 + 1: 1
+
+                // Angle to cell: 10
+                // Heading: 340
+                // angle_diff = 10 - 340: -330
+                // min_angle: 0
+                // max_angle: 359
+                // fov = (359 - 0) / 2: 180
+                // idx: 180 - 330: -150
+                // idx: 360 - 330: 30 =====> This is the right solution
+
+                // Angle to cell: 75
+                // Heading: 225
+                // angle_diff = 75 - 225: -150
+                // min_angle: 0
+                // max_angle: 359
+                // fov = (359 - 0) / 2: 180
+                // idx: 180 - 150: 30
+                // idx: 360 - 150: 210 =====> This is the right solution
+
+                // =================================================================
+                // =====> Este es un caso muy probable
+                // Angle to cell: 217
+                // Heading: 305
+                // angle_diff: -88
+                // min_angle: -180
+                // max_angle: 180
+                // fov: 360
+                // idx: (360 / 2) + (-88): 92
+                // Recuerda que este esta siendo tomado con respecto al heading del robot,
+                // es decir que los -180 van a ser realmente 125 en el frame local
+
+
+                // I might have functions here
 
                 /*
                     Cual es el angulo con respecto a mi index
@@ -307,59 +375,59 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
                 // So remember that now I need to count from the minimum range.
                 // int laser_index = robot_heading / 0.0174533;
                 // int angle_idx = pose_to_cell_angle / 0.0174533;
-                int aux_index = angle_idx;
-                if (laser_index > 180)
-                {
-                    aux_index = 360 - laser_index + angle_idx;
-                }
-                else if (laser_index >= 0 && laser_index <= 180)
-                {
-                    aux_index = laser_index + (laser_index - angle_idx);
-                }
+                // int aux_index = angle_idx;
+                // if (laser_index > 180)
+                // {
+                //     aux_index = 360 - laser_index + angle_idx;
+                // }
+                // else if (laser_index >= 0 && laser_index <= 180)
+                // {
+                //     aux_index = laser_index + (laser_index - angle_idx);
+                // }
 
-                kt_double reading_distance_raw = range_scans[n]->GetRangeReadings()[aux_index];
-                kt_double reading_distance = range_scans[n]->GetRangeReadings()[aux_index];
+                // kt_double reading_distance_raw = range_scans[n]->GetRangeReadings()[aux_index];
+                // kt_double reading_distance = range_scans[n]->GetRangeReadings()[aux_index];
 
-                if (reading_distance > m_max_sensor_range)
-                {
-                    continue;
-                }
+                // if (reading_distance > m_max_sensor_range)
+                // {
+                //     continue;
+                // }
 
-                kt_double distance_to_cell = sqrt(pow(local_grid_robot_pose.GetX() - cell_center.GetX(), 2) + pow(local_grid_robot_pose.GetY() - cell_center.GetY(), 2));
-                if (reading_distance < distance_to_cell)
-                {
-                    continue;
-                }
-                else
-                {
-                    reading_distance = distance_to_cell;
-                }
+                // kt_double distance_to_cell = sqrt(pow(local_grid_robot_pose.GetX() - cell_center.GetX(), 2) + pow(local_grid_robot_pose.GetY() - cell_center.GetY(), 2));
+                // if (reading_distance < distance_to_cell)
+                // {
+                //     continue;
+                // }
+                // else
+                // {
+                //     reading_distance = distance_to_cell;
+                // }
 
-                kt_double point_x = local_grid_robot_pose.GetX() + (reading_distance * cos(pose_to_cell_angle));
-                kt_double point_y = local_grid_robot_pose.GetY() + (reading_distance * sin(pose_to_cell_angle));
+                // kt_double point_x = local_grid_robot_pose.GetX() + (reading_distance * cos(pose_to_cell_angle));
+                // kt_double point_y = local_grid_robot_pose.GetY() + (reading_distance * sin(pose_to_cell_angle));
 
-                karto::Vector2<int> laser_point = utils::grid_operations::getGridPosition({point_x, point_y}, m_cell_resol);
+                // karto::Vector2<int> laser_point = utils::grid_operations::getGridPosition({point_x, point_y}, m_cell_resol);
 
-                if( sqrt(pow((i * m_cell_resol) - point_x, 2) + pow((j * m_cell_resol - point_y), 2)) > 0.5)
-                {
-                    // Aqui probablmente pueda correr un for con los siguientes con dos indices anteriores y dos indices siguientes
-                    continue;
-                }
+                // if( sqrt(pow((i * m_cell_resol) - point_x, 2) + pow((j * m_cell_resol - point_y), 2)) > 0.5)
+                // {
+                //     // Aqui probablmente pueda correr un for con los siguientes con dos indices anteriores y dos indices siguientes
+                //     continue;
+                // }
 
-                std::cout << "Robot heading: " << robot_heading * (180 / M_PI) << std::endl;
-                std::cout << "Angle to cell: " << pose_to_cell_angle * (180 / M_PI) << std::endl;
-                std::cout << "Laser index: " << angle_idx << std::endl;
-                std::cout << "Guessed index: " << aux_index << std::endl;
-                std::cout << "Guessed angle: " << aux_index * (180 / M_PI) << std::endl;
-                std::cout << "Distance to cell: " << distance_to_cell << std::endl;
-                std::cout << "Reading distance: " << reading_distance << std::endl;
-                std::cout << "Reading distance raw: " << reading_distance_raw << std::endl;
-                std::cout << "Robot pose: " << local_robot_cell.GetX() << ", " << local_robot_cell.GetY() << std::endl;
-                std::cout << "Laser coordinates: " << point_x << ", " << point_y << std::endl;
-                std::cout << "Cell center: " << cell_center.GetX() << ", " << cell_center.GetY() << std::endl;
-                std::cout << "Laser cell: " << laser_point.GetX() << ", " << laser_point.GetY() << std::endl;
-                std::cout << "Current cell: " << i << ", " << j << std::endl;
-                std::cout << " =================== " << std::endl;
+                // std::cout << "Robot heading: " << robot_heading * (180 / M_PI) << std::endl;
+                // std::cout << "Angle to cell: " << pose_to_cell_angle * (180 / M_PI) << std::endl;
+                // std::cout << "Laser index: " << angle_idx << std::endl;
+                // std::cout << "Guessed index: " << aux_index << std::endl;
+                // std::cout << "Guessed angle: " << aux_index * (180 / M_PI) << std::endl;
+                // std::cout << "Distance to cell: " << distance_to_cell << std::endl;
+                // std::cout << "Reading distance: " << reading_distance << std::endl;
+                // std::cout << "Reading distance raw: " << reading_distance_raw << std::endl;
+                // std::cout << "Robot pose: " << local_robot_cell.GetX() << ", " << local_robot_cell.GetY() << std::endl;
+                // std::cout << "Laser coordinates: " << point_x << ", " << point_y << std::endl;
+                // std::cout << "Cell center: " << cell_center.GetX() << ", " << cell_center.GetY() << std::endl;
+                // std::cout << "Laser cell: " << laser_point.GetX() << ", " << laser_point.GetY() << std::endl;
+                // std::cout << "Current cell: " << i << ", " << j << std::endl;
+                // std::cout << " =================== " << std::endl;
 
                 // Inidividual cell limits
                 // kt_double limit_x = i * m_cell_resol;
