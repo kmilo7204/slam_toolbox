@@ -179,8 +179,55 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
         std::cout << "Lower limit cell: " << lower_limit_cell.GetX() << ", " << lower_limit_cell.GetY() << std::endl;
         std::cout << "Upper limit cell: " << upper_limit_cell.GetX() << ", " << upper_limit_cell.GetY() << std::endl;
 
-        // ======================= START OF CELLS ITERATIONS ======================= //
+        // kt_double robot_heading = robot_pose_raw.GetHeading();
+        // robot_heading = robot_heading < 0.0 ? (2.0 * M_PI + robot_heading) : robot_heading;
+        // int laser_index = robot_heading / 0.0174533;
+        // int robot_heading_index = robot_heading / 0.0174533;
+
+        // // Cell 97, 101 - Cell 104, 101
+        // int cell_x = 104;
+        // int cell_y = 109;
+        // karto::Vector2<kt_double> cell_center{ cell_x * m_cell_resol + (m_cell_resol / 2), cell_y * m_cell_resol + (m_cell_resol / 2) };
+        // kt_double pose_to_cell_angle = atan2(cell_center.GetY() - local_grid_robot_pose.GetY(), cell_center.GetX() - local_grid_robot_pose.GetX());
+        // pose_to_cell_angle = pose_to_cell_angle > 0 ? pose_to_cell_angle : (2.0 * M_PI + pose_to_cell_angle);
+
+        // int angle_idx = pose_to_cell_angle / 0.0174533;
+
+        // int aux_index = angle_idx;
+        // if (laser_index > 180)
+        // {
+        //     aux_index = 360 - laser_index + angle_idx;
+        // }
+        // else if (laser_index >= 0 && laser_index <= 180)
+        // {
+        //     aux_index = laser_index + (laser_index - angle_idx);
+        // }
+
+        // kt_double reading_distance = range_scans[n]->GetRangeReadings()[aux_index];
+        // kt_double point_x = local_grid_robot_pose.GetX() + (reading_distance * cos(pose_to_cell_angle));
+        // kt_double point_y = local_grid_robot_pose.GetY() + (reading_distance * sin(pose_to_cell_angle));
+
+        // karto::Vector2<int> laser_point = utils::grid_operations::getGridPosition({point_x, point_y}, m_cell_resol);
+
+        // std::cout << "Robot Heading: " << robot_heading << std::endl;
+        // std::cout << "Angle to cell: " << pose_to_cell_angle << std::endl;
+        // std::cout << "Guessed index: " << aux_index << std::endl;
+        // std::cout << "Guessed angle: " << aux_index * 0.0174533 << std::endl;
+        // std::cout << "Cell robot pose: " << local_robot_cell.GetX() << ", " << local_robot_cell.GetY() << std::endl;
+        // std::cout << "Reading distance: " << reading_distance << std::endl;
+        // std::cout << "Evaluated cell: " << cell_x << ", " << cell_y << std::endl;
+        // std::cout << "Laser cell: " << point_x << ", " << point_y << std::endl;
+        // std::cout << "Laser points cells: " << laser_point.GetX() << ", " << laser_point.GetY() << std::endl;
+        // std::cout << "Cell center: " << cell_center.GetX() << ", " << cell_center.GetY() << std::endl;
+
         // for (int i = lower_limit_cell.GetX(); i < local_robot_cell.GetX(); ++i)
+
+        // Resolucion es variable
+        // Estoy en una celda y cuales son lso lasers que ven esas celda
+        // Si lo hago por celda me estoy ahorrando un computo de mas
+        // Sobre una celda que scnas la ven
+
+        // Tomo el grupo de lasers que tengo
         for (int i = lower_limit_cell.GetX(); i < upper_limit_cell.GetX(); ++i)
         {
             for(int j = lower_limit_cell.GetY(); j < upper_limit_cell.GetY(); ++j)
@@ -192,13 +239,26 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
                     continue;
                 }
 
+                /*
+                    Things to keep in mind
+                        - Laser angular resolution
+                        - Laser min range (Which will be my starting point)
+                */
+
                 // This one will give me the information
-                LaserRangeFinder* laserRangeFinder = range_scans[n]->GetLaserRangeFinder();
+                karto::LaserRangeFinder* laserRangeFinder = range_scans[n]->GetLaserRangeFinder();
 
                 // These will give me the information I need for every laser
-                kt_double rangeThreshold = pLaserRangeFinder->GetRangeThreshold();
-                kt_double minimumAngle = pLaserRangeFinder->GetMinimumAngle();
-                kt_double angularResolution = pLaserRangeFinder->GetAngularResolution();
+                kt_double rangeThreshold = laserRangeFinder->GetRangeThreshold();
+                kt_double min_angle = laserRangeFinder->GetMinimumAngle();
+                kt_double max_angle = laserRangeFinder->GetMaximumAngle();
+
+                kt_double angular_resolution = laserRangeFinder->GetAngularResolution();
+
+                // Min range to Max range
+                // For laser range [-90, 90]
+                // For laser range [-180, 180]
+                // For laser range [0, 360]
 
                 // There should be an operator for this, but this is working good.
                 karto::Vector2<kt_double> cell_center{ i * m_cell_resol + (m_cell_resol / 2), j * m_cell_resol + (m_cell_resol / 2) };
@@ -208,19 +268,45 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
                 kt_double robot_heading = robot_pose_raw.GetHeading();
                 robot_heading = robot_heading < 0.0 ? (2.0 * M_PI + robot_heading) : robot_heading;
 
-                int laser_index = robot_heading / 0.0174533; // This one will be changed
+
+                // Set the angular resolution
+                int laser_index = robot_heading / angular_resolution;
+                int angle_idx = laser_index;
+
+                int angle_diff = laser_index - robot_heading;
+
+                angle_diff = atan2(sin(angle_diff), cos(angle_diff));
+
+                if (angle_diff < min_angle || angle_diff >  max_angle)
+                {
+                    // Cause the laser does not see that cell
+                    return;
+                }
+
+                // Theoretically we know what is the half of the laser scan
+                // total_range / 2 + the angle
+                // It would work for both options
+
+                float fov = max_angle - min_angle;
+
+                // I think this is it
+                int idx = fov / 2.0 + angle_diff;
+
+                /*
+                    Cual es el angulo con respecto a mi index
+
+                    Si conozco el angulo entre la celda y la horizontal
+                    Y si conozco el angulo entre heading y la horizontal
+
+                    Entonces puedo encontrar el angulo entre la celda y el heading,
+                    esto me va a dar el angulo directamente
+                */
+
+
 
                 // So remember that now I need to count from the minimum range.
-                // There should be an operator for this, but this is working good.
-                karto::Vector2<kt_double> cell_center{ i * m_cell_resol + (m_cell_resol / 2), j * m_cell_resol + (m_cell_resol / 2) };
-                kt_double pose_to_cell_angle = atan2(cell_center.GetY() - local_grid_robot_pose.GetY(), cell_center.GetX() - local_grid_robot_pose.GetX());
-                pose_to_cell_angle = pose_to_cell_angle > 0 ? pose_to_cell_angle : (2.0 * M_PI + pose_to_cell_angle);
-
-                kt_double robot_heading = robot_pose_raw.GetHeading();
-                robot_heading = robot_heading < 0.0 ? (2.0 * M_PI + robot_heading) : robot_heading;
-
-                int laser_index = robot_heading / 0.0174533;
-                int angle_idx = pose_to_cell_angle / 0.0174533;
+                // int laser_index = robot_heading / 0.0174533;
+                // int angle_idx = pose_to_cell_angle / 0.0174533;
                 int aux_index = angle_idx;
                 if (laser_index > 180)
                 {
@@ -249,7 +335,6 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
                     reading_distance = distance_to_cell;
                 }
 
-
                 kt_double point_x = local_grid_robot_pose.GetX() + (reading_distance * cos(pose_to_cell_angle));
                 kt_double point_y = local_grid_robot_pose.GetY() + (reading_distance * sin(pose_to_cell_angle));
 
@@ -277,39 +362,232 @@ kt_double InformationEstimates::findMutualInfo(std::vector<karto::LocalizedRange
                 std::cout << " =================== " << std::endl;
 
                 // Inidividual cell limits
-                kt_double limit_x = i * m_cell_resol;
-                kt_double limit_y = j * m_cell_resol;
+                // kt_double limit_x = i * m_cell_resol;
+                // kt_double limit_y = j * m_cell_resol;
 
-                std::pair<std::vector<kt_double>, std::vector<kt_double>> intersections = utils::grid_operations::computeLineBoxIntersection(
-                robot_pose.GetPosition(), transformed_laser, robot_grid_position, beam_grid, limit_x, limit_y, m_cell_resol);
+                // std::pair<std::vector<kt_double>, std::vector<kt_double>> intersections = utils::grid_operations::computeLineBoxIntersection(
+                // local_grid_robot_pose.GetPosition(), transformed_laser, robot_grid_position, beam_grid, limit_x, limit_y, m_cell_resol);
 
-                // In case we did not find a measurement
-                if (intersections.first.size() == 0)
-                {
-                    continue;
-                }
+                // // In case we did not find a measurement
+                // if (intersections.first.size() == 0)
+                // {
+                //     continue;
+                // }
 
-                // Enter (d1) and Exit (d2) distances
-                std::vector<kt_double> distances;
-                for (int k = 0; k < intersections.first.size(); ++k)
-                {
-                    // From robot position to intersection points
-                    karto::Vector2<kt_double> intersection{intersections.first[k], intersections.second[k]};
-                    kt_double distance = robot_pose.GetPosition().Distance(intersection);
-                    distances.push_back(distance);
-                }
+                // // Enter (d1) and Exit (d2) distances
+                // std::vector<kt_double> distances;
+                // for (int k = 0; k < intersections.first.size(); ++k)
+                // {
+                //     // From robot position to intersection points
+                //     karto::Vector2<kt_double> intersection{intersections.first[k], intersections.second[k]};
+                //     kt_double distance = local_grid_robot_pose.GetPosition().Distance(intersection);
+                //     distances.push_back(distance);
+                // }
 
-                // Measurement outcomes vector {Pfree, Pocc, Pun}
-                std::vector<kt_double> probabilities {
-                    calculateScanMassProbabilityBetween(distances[1], m_max_sensor_range),
-                    calculateScanMassProbabilityBetween(distances[0], distances[1]),
-                    calculateScanMassProbabilityBetween(0.0f, distances[0])
-                };
-
+                // // Measurement outcomes vector {Pfree, Pocc, Pun}
+                // std::vector<kt_double> probabilities {
+                //     calculateScanMassProbabilityBetween(distances[1], m_max_sensor_range),
+                //     calculateScanMassProbabilityBetween(distances[0], distances[1]),
+                //     calculateScanMassProbabilityBetween(0.0f, distances[0])
+                // };
             }
         }
+
+        // for (int i = 0; i < n_cells_x; ++i)
+        // {
+        //     for (int j = 0; j < n_cells_y; ++j)
+        //     {
+        //         /*
+        //             Tengo una celda especifica dentro del mapa
+        //             Puedo saber que lasers ven esa celda para evaluar estos
+
+        //             - I have this not written but I Need to find a way to calculate the mutual information for a group
+        //             of scans when I remove one element of that group
+        //             - I can Iterate over the scans here
+        //             - But I would nneed to removew one scan at a time
+        //         */
+        //         // Iterating through the scans to find which one hits this cell
+        //         // std::vector<std::vector<kt_double>> cell_probabilities;
+        //         // int current_scan_idx = 0;
+        //         if ((i < lower_limit_cell.GetX() || i > upper_limit_cell.GetX()) || (j < lower_limit_cell.GetY() || j > upper_limit_cell.GetY()))
+        //         {
+        //             continue;
+        //         }
+
+        //         karto::Vector2<kt_double> cell_center{ i * m_cell_resol + (m_cell_resol / 2), j * m_cell_resol + (m_cell_resol / 2) };
+        //         kt_double pose_to_cell_angle = atan2(cell_center.GetY() - local_grid_robot_pose.GetY() , cell_center.GetX() - local_grid_robot_pose.GetX());
+        //         int laser_index = (M_PI + pose_to_cell_angle - local_grid_robot_pose.GetHeading()) * (180.0 / M_PI);
+
+        //         // This is: (180.0 / M_PI) = 0.01745329238474369. Used for finding the index
+        //         std::cout << "Robot heading: " << local_grid_robot_pose.GetHeading() * (180.0 / M_PI) << std::endl;
+        //         // std::cout << "Pose to individual cell Angle: " << pose_to_cell_angle * (180.0 / M_PI) << std::endl;
+        //         // std::cout << "Final index: " << laser_index << std::endl;
+        //         // std::cout << "Final angle: " << laser_index * (M_PI / 180.0) << std::endl;
+
+        //         kt_double reading_distance = range_scans[n]->GetRangeReadings()[laser_index];
+        //         kt_double point_x = local_grid_robot_pose.GetX() + (reading_distance * cos(laser_index / (180.0 / M_PI)));
+        //         kt_double point_y = local_grid_robot_pose.GetY() + (reading_distance * sin(laser_index / (180.0 / M_PI)));
+
+        //         std::cout << "Transformed laser point: " << point_x << ", " << point_y << std::endl;
+        //         std::cout << "Current cell position: " << cell_center.GetX() << ", " << cell_center.GetY() << std::endl;
+
+        //         // std::cout << "Transformed Y: " << point_y << std::endl;
+
+        //         // point.SetX(scanPose.GetX() + (rangeReading * cos(angle)));
+        //         // point.SetY(scanPose.GetY() + (rangeReading * sin(angle)));
+        //         // m_UnfilteredPointReadings.push_back(point);
+
+        //         // Now I have the index, I can try to translate it with our given pose and find its x and y point
+
+        //         // std::cout << "Current cell center: " << cell_center.GetX() << ", " << cell_center.GetY() << std::endl;
+
+        //         // result *= 0.01745329238474369;
+        //         // std::cout << "Index: " << result << std::endl;
+        //         // laser_readings.size();
+        //         // We should not evaluate more cells that the number of beams
+        //         // Tienes que pensar en:
+        //         //     Tomas la celda y evalua el angulo
+        //         //     Vas a el scan y encuentras con el angulo previo, el haz de luz que cae en ese angulo, calculas y te mueves
+        //         //     Esto debo hacerlo para todas las celdas que el haz de luz atraviese.
+        //         // Get robot orientation
+        //         // I need some angle difference // This is an icognit for me
+        //         // Find the index
+        //     }
+        //     return;
+        // }
         std::cout << "<------------------------->" << std::endl;
     }
+                // for (const auto & scan : range_scans)
+                // {
+    //     //             // On this way I make sure to extract one laser at a time
+    //     //             if (current_scan_idx == n)
+    //     //             {
+    //     //                 continue;
+    //     //             }
+
+    //     //             // i and j are the current row and column
+    //     //             if ((i < lower_limit_cell.GetX() || i > upper_limit_cell.GetX()) || (j < lower_limit_cell.GetY() || j > upper_limit_cell.GetY()))
+    //     //             {
+    //     //                 // I would need some modification here, since it is taking into account only the first
+    //     //                 // laser, but not considering the following ones
+
+    //     //                 // Current cell is outside the range of vision of the current Scan
+    //     //                 continue;
+    //     //             }
+
+    //     //             // Current scan laser readings
+    //     //             karto::PointVectorDouble laser_readings = scan->GetPointReadings(true);
+
+    //     //             karto::Pose2 robot_pose(robot_pose_raw.GetX() - m_low_x, robot_pose_raw.GetY() - m_low_y, robot_pose_raw.GetHeading());
+    //     //             karto::Vector2<int> robot_grid_position = utils::grid_operations::getGridPosition(robot_pose.GetPosition(), m_cell_resol);
+
+    //     //             /*
+    //     //                 Ahora que estoy dentro de un grid local, debo hacer una transformacion simple de
+    //     //                 la posicion del robot y de cada uno de los lasers, para asi poder compararlos correctamente
+    //     //                 con cada una de las celdas.
+    //     //             */
+
+    //     //             /*
+    //     //                 @kmilo7204 meta: hmm, I don't follow this bit.
+    //     //                 If you know where the cell is, where the scan was acquired, and how it is laid out in memory,
+    //     //                 why not simply computing the index of the ray(s) that need to be looked at?
+
+    //     //                 You can do that in the grid frame or in the scan frame.
+    //     //                 Perhaps the latter is easiest, you can then compute the angles of cell corners and use rays that
+    //     //                 fall in the same angular interval. Does that make sense?
+
+    //     //                 LETS MAKE SOME TEST FOR THIS
+    //     //                 - For addressing the above comment:
+    //     //                     - Find the angle between the cell and a laser scan.
+    //     //                     - Find the laser index that fall into that vision range.
+    //     //                         - Take into account the current heading and the angle increment between each laser beam
+
+    //     //                 La propuesta es:
+    //     //                     - Ya conozco donde esta la celda y ya conozco desde donde el scan fue adquirido, porque simplmente no computar el index
+    //     //                     del rayo que tenemos que ver.
+    //     //                     - Podria hacerse en el frame del scan, y una vez conozco esto, puedo computar los angulosss
+
+    //     //                 Lo que hago a continuacion es buscar a fuerza bruta cuales son haces de luces que caen en esa celda.
+    //     //             */
+
+
+    //     //             // ----- Point 3 -----
+    //     //             // I could use some kind of angle to filter the region where the scan is.
+    //     //             // I can use the range based for here
+    //     //             for (int i = 0; i < laser_readings.size(); ++i)
+    //     //             {
+    //     //                 karto::Vector2<kt_double> transformed_laser{laser_readings[i].GetX() - m_low_x, laser_readings[i].GetY() - m_low_y};
+
+    //     //                 // I nmutual_informationeed to transform here
+    //     //                 karto::Vector2<int> beam_grid = utils::grid_operations::getGridPosition(transformed_laser, m_cell_resol);
+
+    //     //                 // This calculation is not real, cause resting the limits no the center of the cell
+    //     //                 kt_double laser_to_grid_dist =
+    //     //                     sqrt(pow((transformed_laser.GetX() - (i * m_cell_resol)), 2) + pow((transformed_laser.GetY() - (j * m_cell_resol)), 2));
+
+    //     //                 // Compare the point here, the transformed laser and the cell position
+    //     //                 // If not fulfill the condition I wrote above, continue
+    //     //                 if (laser_to_grid_dist > m_cell_resol)
+    //     //                 {
+    //     //                     continue;
+    //     //                 }
+
+    //     //                 // ----- Point 4 -----
+    //     //                 // Aqui ya encontre cual es el haz de luz que funciona
+    //     //                 // Ahora debo hacer el calculo de observacion hasta esa celda final
+
+    //     //                 // Inidividual cell limits
+    //     //                 kt_double limit_x = i * m_cell_resol;
+    //     //                 kt_double limit_y = j * m_cell_resol;
+
+    //     //                 std::pair<std::vector<kt_double>, std::vector<kt_double>> intersections = utils::grid_operations::computeLineBoxIntersection(
+    //     //                 robot_pose.GetPosition(), transformed_laser, robot_grid_position, beam_grid, limit_x, limit_y, m_cell_resol);
+
+    //     //                 // In case we did not find a measurement
+    //     //                 if (intersections.first.size() == 0)
+    //     //                 {
+    //     //                     continue;
+    //     //                 }
+
+    //     //                 // Enter (d1) and Exit (d2) distances
+    //     //                 std::vector<kt_double> distances;
+    //     //                 for (int k = 0; k < intersections.first.size(); ++k)
+    //     //                 {
+    //     //                     // From robot position to intersection points
+    //     //                     karto::Vector2<kt_double> intersection{intersections.first[k], intersections.second[k]};
+    //     //                     kt_double distance = robot_pose.GetPosition().Distance(intersection);
+    //     //                     distances.push_back(distance);
+    //     //                 }
+
+    //     //                 // Measurement outcomes vector {Pfree, Pocc, Pun}
+    //     //                 std::vector<kt_double> probabilities {
+    //     //                     calculateScanMassProbabilityBetween(distances[1], m_max_sensor_range),
+    //     //                     calculateScanMassProbabilityBetween(distances[0], distances[1]),
+    //     //                     calculateScanMassProbabilityBetween(0.0f, distances[0])
+    //     //                 };
+
+    //     //                 // I got the probability of seen the current cell as o/f/u
+    //     //                 // Now I need to save the current measuremets of that cell to calculate the histogram
+    //     //                 cell_probabilities.push_back(probabilities);
+    //     //             } // EOF Laser Readings FOR
+
+    //     //             ++current_scan_idx;
+    //     //         } // EOF Range Scans FOR
+
+
+    //     //         std::unordered_map<map_tuple, kt_double, utils::tuple_hash::HashTuple> meas_out_prob = computeMeasurementOutcomesHistogram(cell_probabilities);
+
+    //     //         kt_double cell_mutual_inf = 0.0f;
+    //     //         for (auto& pair : meas_out_prob)
+    //     //         {
+    //     //             cell_mutual_inf +=  pair.second * measurementOutcomeEntropy(pair.first);
+    //     //         }
+    //     //         // 1.0 for the entropy since the cell is in an unknown state
+    //     //         mutual_information += 1.0 - cell_mutual_inf;
+    //     //     } // EOF Columns FOR
+    //     // } // EOF Rows FOR
+    // } // EOF Number Scans FOR
+    // return mutual_information;
     return 5.0;
 }
 
@@ -721,3 +999,48 @@ kt_double InformationEstimates::calculateScanMassProbabilityBetween(kt_double ra
     return m_obs_nu * (exp(-m_obs_lambda*range_1) - exp(-m_obs_lambda*range_2));
 }
 
+
+
+        // int acumm = 0;
+        // for (int i = 0; i < 360; ++i)
+        // {
+        //     laser_index = laser_index > 359 ? 0 : laser_index;
+
+        //     // Aqui debo considerar que estoy moviendome sobre los beams del laser.
+        //     kt_double reading_distance = range_scans[n]->GetRangeReadings()[i]; // This is I because in reality I want to start reading from this point
+        //     if (reading_distance > m_max_sensor_range)
+        //     {
+        //         ++acumm;
+        //         ++laser_index;
+        //         std::cout << "Skipped: " << laser_index * 0.0174533 << std::endl;
+        //         std::cout << " =================== " << std::endl;
+        //         continue;
+        //     }
+
+        //     // La lectura obtenida, la proyecto al angulo deseado, es decir, ese angulo es el mismo pose_to_cell_angle
+        //     kt_double point_x = local_grid_robot_pose.GetX() + (reading_distance * cos(laser_index * 0.0174533));
+        //     kt_double point_y = local_grid_robot_pose.GetY() + (reading_distance * sin(laser_index * 0.0174533));
+
+        //     karto::Vector2<int> laser_point = utils::grid_operations::getGridPosition({point_x, point_y}, m_cell_resol);
+
+        //     std::cout << "Robot Heading: " << robot_heading << std::endl;
+        //     std::cout << "Angle to cell: " << pose_to_cell_angle << std::endl;
+        //     std::cout << "Guessed angle: " << aux_index << std::endl;
+        //     std::cout << "i value: " << i << std::endl;
+        //     std::cout << "Acummulated angle: " << acumm << std::endl;
+        //     // std::cout << "Current angle: " << real_index * 0.0174533 << std::endl;
+        //     std::cout << "Current angle: " << laser_index * 0.0174533 << std::endl;
+        //     std::cout << "Cell robot pose: " << local_robot_cell.GetX() << ", " << local_robot_cell.GetY() << std::endl;
+        //     std::cout << "Reading distance: " << reading_distance << std::endl;
+        //     std::cout << "Laser points cells: " << laser_point.GetX() << ", " << laser_point.GetY() << std::endl;
+        //     std::cout << "Laser cell: " << point_x << ", " << point_y << std::endl;
+        //     std::cout << " =================== " << std::endl;
+
+        //     ++acumm;
+        //     ++laser_index;
+
+        //     // if ( laser_point.GetX() > upper_limit_cell.GetX() || laser_point.GetY() > upper_limit_cell.GetY() || laser_point.GetX() < lower_limit_cell.GetX() || laser_point.GetY() < lower_limit_cell.GetY())
+        //     // {
+        //     //     std::cout << "There is something wrong" << std::endl;
+        //     // }
+        // }
